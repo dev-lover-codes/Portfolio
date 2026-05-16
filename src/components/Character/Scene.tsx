@@ -12,6 +12,7 @@ import {
 } from "./utils/mouseUtils";
 import setAnimations from "./utils/animationUtils";
 import { setProgress } from "../utils/loadingUtils";
+import { setCharTimeline, setAllTimeline } from "../utils/GsapScroll";
 
 const Scene = () => {
   const canvasDiv = useRef<HTMLDivElement | null>(null);
@@ -52,6 +53,8 @@ const Scene = () => {
       const progress = setProgress((value) => setLoading(value));
       const { loadCharacter } = setCharacter(renderer, scene, camera);
 
+      let resizeHandler: () => void;
+      let timelineCleanup: () => void;
       loadCharacter().then((gltf) => {
         if (gltf) {
           const animations = setAnimations(gltf);
@@ -69,9 +72,12 @@ const Scene = () => {
               animations.startIntro();
             }, 2500);
           });
-          window.addEventListener("resize", () =>
-            handleResize(renderer, camera, canvasDiv, characterInstance)
-          );
+          timelineCleanup = setCharTimeline(characterInstance, camera);
+          setAllTimeline();
+
+          resizeHandler = () =>
+            handleResize(renderer, camera, canvasDiv, characterInstance);
+          window.addEventListener("resize", resizeHandler);
         }
       });
 
@@ -98,16 +104,16 @@ const Scene = () => {
         });
       };
 
-      document.addEventListener("mousemove", (event) => {
-        onMouseMove(event);
-      });
+      document.addEventListener("mousemove", onMouseMove);
       const landingDiv = document.getElementById("landingDiv");
       if (landingDiv) {
         landingDiv.addEventListener("touchstart", onTouchStart);
         landingDiv.addEventListener("touchend", onTouchEnd);
       }
+
+      let animationFrameId: number;
       const animate = () => {
-        requestAnimationFrame(animate);
+        animationFrameId = requestAnimationFrame(animate);
         if (headBone) {
           handleHeadRotation(
             headBone,
@@ -126,13 +132,16 @@ const Scene = () => {
         renderer.render(scene, camera);
       };
       animate();
+
       const currentCanvasDiv = canvasDiv.current;
       return () => {
         clearTimeout(debounce);
+        cancelAnimationFrame(animationFrameId);
+        if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+        if (timelineCleanup) timelineCleanup();
+        document.removeEventListener("mousemove", onMouseMove);
         scene.clear();
         renderer.dispose();
-        // Remove individual listeners if needed, but here we added them inside useEffect
-        // We should ideally have references to the functions to remove them
         if (currentCanvasDiv) {
           currentCanvasDiv.removeChild(renderer.domElement);
         }
