@@ -27,3 +27,8 @@ dist-ssr
 .wrangler
 .idx/
 .vercel
+
+# Gemini / Planning / Graphify
+.gemini/**
+.planning/**
+graphify-out/**
